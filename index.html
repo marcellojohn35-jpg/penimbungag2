@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>GAG2 ULTIMATE MANAGER FINAL</title>
+    <style>
+        :root { --neon: #00ff9f; --bg: #0d0d0d; --card: #1a1a1a; }
+        body { font-family: 'Courier New', monospace; background: var(--bg); color: var(--neon); padding: 15px; }
+        .card { background: var(--card); border: 1px solid var(--neon); padding: 15px; margin-bottom: 15px; }
+        input, select { background: #000; color: var(--neon); border: 1px solid var(--neon); padding: 8px; width: 100%; margin: 5px 0; box-sizing: border-box; }
+        button { background: var(--neon); color: #000; border: none; padding: 10px; cursor: pointer; font-weight: bold; width: 100%; margin: 5px 0; }
+        table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 10px; }
+        th, td { border: 1px solid var(--neon); padding: 5px; text-align: left; }
+    </style>
+</head>
+<body>
+
+<h2 style="text-align:center;">GAG2 ULTIMATE MANAGER</h2>
+<div id="nav" class="card">
+    <button onclick="show('dash')">📊 DASHBOARD</button>
+    <button onclick="show('trans')">🛒 TRANSAKSI</button>
+    <button onclick="show('stok')">⚙️ INVENTORI</button>
+    <button onclick="show('hist')">📜 RIWAYAT & STOK KELUAR</button>
+    <button onclick="show('calc')" style="background:#fff;">🧮 KALKULATOR</button>
+</div>
+
+<div id="content">
+    <div id="dash" class="card" style="display:none;">
+        <h3>STATISTIK HARIAN</h3>
+        <input type="date" id="dateFilter" onchange="renderDash()">
+        <div id="dashResult"></div>
+        <button onclick="show('nav')">BACK</button>
+    </div>
+
+    <div id="trans" class="card" style="display:none;">
+        <h3>TRANSAKSI</h3>
+        <input type="text" id="custName" placeholder="NAMA PEMBELI">
+        <input type="time" id="timeTrans">
+        <div id="cartArea"></div>
+        <button onclick="addCartItem()">+ TAMBAH ITEM</button>
+        <button onclick="processTx()" style="background:#fff;">PROSES</button>
+        <button onclick="show('nav')">BACK</button>
+    </div>
+
+    <div id="stok" class="card" style="display:none;">
+        <h3>INVENTORI</h3>
+        <input type="text" id="newBarang" placeholder="NAMA BARANG">
+        <input type="number" id="newModal" placeholder="MODAL">
+        <input type="number" id="newJual" placeholder="JUAL">
+        <button onclick="addBarang()">+ TAMBAH BARANG</button>
+        <table id="tblStok"></table>
+        <button onclick="show('nav')">BACK</button>
+    </div>
+
+    <div id="hist" class="card" style="display:none;">
+        <h3>RIWAYAT & STOK KELUAR</h3>
+        <table id="tblHist"></table>
+        <button onclick="show('nav')">BACK</button>
+    </div>
+
+    <div id="calc" class="card" style="display:none;">
+        <h3>KALKULATOR</h3>
+        <input type="text" id="calcRes" readonly>
+        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap:5px;">
+            <button onclick="calc('7')">7</button><button onclick="calc('8')">8</button><button onclick="calc('9')">9</button><button onclick="calc('/')">/</button>
+            <button onclick="calc('4')">4</button><button onclick="calc('5')">5</button><button onclick="calc('6')">6</button><button onclick="calc('*')">*</button>
+            <button onclick="calc('1')">1</button><button onclick="calc('2')">2</button><button onclick="calc('3')">3</button><button onclick="calc('-')">-</button>
+            <button onclick="calc('0')">0</button><button onclick="calc('C')">C</button><button onclick="calc('=')">=</button><button onclick="calc('+')">+</button>
+        </div>
+        <button onclick="show('nav')">BACK</button>
+    </div>
+</div>
+
+<script>
+    function getLocalDate() {
+        let d = new Date();
+        let offset = d.getTimezoneOffset();
+        d = new Date(d.getTime() - (offset * 60 * 1000));
+        return d.toISOString().split('T')[0];
+    }
+
+    let db = JSON.parse(localStorage.getItem('gag2_ult')) || {
+        barang: [
+            {n:"Dragon Breath", m:2700, j:5000, s:0}, {n:"Ghost Pepper", m:750, j:3000, s:0}, {n:"Hypno Bloom", m:500, j:2000, s:0},
+            {n:"Moon Bloom", m:500, j:2000, s:0}, {n:"Venom Splitter", m:500, j:2000, s:0}, {n:"Venus Fly Trap", m:500, j:1000, s:0},
+            {n:"Mega Seed", m:300, j:1000, s:0}, {n:"Rainbow Seed", m:150, j:1000, s:0}, {n:"Gold Seed", m:200, j:1000, s:0},
+            {n:"SS", m:200, j:1000, s:0}, {n:"SWC", m:300, j:1000, s:0}, {n:"Unicorn", m:500, j:2000, s:0},
+            {n:"Dragonfly", m:500, j:1500, s:0}, {n:"Raccoon", m:17000, j:25000, s:0}, {n:"50M Sheckles", m:500, j:1000, s:0},
+            {n:"1B Sheckles", m:10000, j:20000, s:0}, {n:"LS", m:250, j:1000, s:0}, {n:"Trowel", m:500, j:1000, s:0},
+            {n:"Butterfly", m:3000, j:8000, s:0}, {n:"Bear", m:500, j:1000, s:0}, {n:"Robin", m:200, j:1000, s:0},
+            {n:"Bee", m:300, j:1000, s:0}, {n:"Turtle", m:200, j:1000, s:0}, {n:"Deer", m:200, j:1000, s:0},
+            {n:"Monkey", m:500, j:1000, s:0}
+        ],
+        transaksi: [],
+        logStokMasuk: []
+    };
+
+    function show(id) {
+        document.querySelectorAll('#content > div').forEach(d => d.style.display='none');
+        if(id === 'nav') return;
+        document.getElementById(id).style.display='block';
+        if(id=='stok') renderStok();
+        if(id=='hist') renderHist();
+        if(id=='dash') { document.getElementById('dateFilter').value = getLocalDate(); renderDash(); }
+    }
+
+    function addBarang() {
+        let n = document.getElementById('newBarang').value, m = parseInt(document.getElementById('newModal').value)||0, j = parseInt(document.getElementById('newJual').value)||0;
+        if(n) { db.barang.push({n, m, j, s:0}); localStorage.setItem('gag2_ult', JSON.stringify(db)); renderStok(); }
+    }
+
+    function updateStokLangsung(i, v) {
+        let s = parseInt(v)||0, diff = s - (parseInt(db.barang[i].s)||0);
+        if(diff > 0) db.logStokMasuk.push({t: getLocalDate(), amt: diff * db.barang[i].m});
+        db.barang[i].s = s; localStorage.setItem('gag2_ult', JSON.stringify(db));
+    }
+
+    function processTx() {
+        let items = document.querySelectorAll('.i-sel'), qtys = document.querySelectorAll('.i-qty'), u=0, o=0, det=[];
+        items.forEach((it, i) => {
+            let b = db.barang.find(x => x.n == it.value), q = parseInt(qtys[i].value)||0;
+            if(q > 0) { b.s -= q; u += (b.j - b.m) * q; o += b.j * q; det.push(`${it.value} (${q})`); }
+        });
+        db.transaksi.push({p:document.getElementById('custName').value||"Anonim", jam:document.getElementById('timeTrans').value||"00:00", t:getLocalDate(), u, o, det:det.join(', ')});
+        localStorage.setItem('gag2_ult', JSON.stringify(db)); alert("TRANSAKSI TEREKAM!");
+    }
+
+    function renderStok() {
+        let h = `<tr><th>Nama</th><th>Modal</th><th>Jual</th><th>Stok</th><th>X</th></tr>`;
+        db.barang.forEach((b, i) => {
+            h += `<tr><td>${b.n}</td><td><input type="number" value="${b.m}" onchange="db.barang[${i}].m=this.value;localStorage.setItem('gag2_ult', JSON.stringify(db))"></td>
+                  <td><input type="number" value="${b.j}" onchange="db.barang[${i}].j=this.value;localStorage.setItem('gag2_ult', JSON.stringify(db))"></td>
+                  <td><input type="number" value="${b.s}" onchange="updateStokLangsung(${i}, this.value)"></td>
+                  <td><button onclick="db.barang.splice(${i},1);localStorage.setItem('gag2_ult', JSON.stringify(db));renderStok()">X</button></td></tr>`;
+        });
+        document.getElementById('tblStok').innerHTML = h;
+    }
+
+    function renderHist() {
+        let h = `<tr><th>Jam</th><th>Detail</th><th>Profit</th></tr>`;
+        db.transaksi.forEach(x => h += `<tr><td>${x.jam}</td><td>${x.det}</td><td>${x.u.toLocaleString()}</td></tr>`);
+        document.getElementById('tblHist').innerHTML = h;
+    }
+
+    function renderDash() {
+        let d = document.getElementById('dateFilter').value, tr=db.transaksi.filter(x=>x.t==d), st=db.logStokMasuk.filter(x=>x.t==d);
+        let mod = db.barang.reduce((a,b)=>a+(b.s*b.m),0), pem = tr.reduce((a,x)=>a+x.o,0), peng = st.reduce((a,x)=>a+x.amt,0), unt = tr.reduce((a,x)=>a+x.u,0);
+        document.getElementById('dashResult').innerHTML = `<p>TOTAL MODAL (SISA): ${mod.toLocaleString()}</p><p>TOTAL PEMASUKAN: ${pem.toLocaleString()}</p><p>TOTAL PENGELUARAN: ${peng.toLocaleString()}</p><p>TOTAL KEUNTUNGAN: ${unt.toLocaleString()}</p>`;
+    }
+
+    function calc(v) { if(v=='C') document.getElementById('calcRes').value=''; else if(v=='=') document.getElementById('calcRes').value=eval(document.getElementById('calcRes').value); else document.getElementById('calcRes').value += v; }
+    function addCartItem() { let d = document.createElement('div'); d.innerHTML = `<select class="i-sel">${db.barang.map(b=>`<option value="${b.n}">${b.n}</option>`).join('')}</select><input type="number" class="i-qty" placeholder="Qty">`; document.getElementById('cartArea').appendChild(d); }
+    show('nav');
+</script>
+</body>
+</html>
